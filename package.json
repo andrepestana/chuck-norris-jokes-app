@@ -1,6 +1,6 @@
 {
   "name": "chuck-norris-jokes-app",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "No description needed",
   "productName": "Chuck Norris Jokes",
   "cordovaId": "com.github.andrepestana",

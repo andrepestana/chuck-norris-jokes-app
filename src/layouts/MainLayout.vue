@@ -41,12 +41,6 @@ export default {
       leftDrawerOpen: false,
       essentialLinks: [
         {
-          title: 'Pay me a coffee',
-          caption: 'if it made you smile',
-          icon: 'local_cafe',
-          link: 'https://andrepestana.github.io'
-        },
-        {
           title: 'About the Author',
           caption: '',
           icon: 'emoji_people',

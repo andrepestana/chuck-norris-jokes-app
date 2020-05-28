@@ -1,38 +1,44 @@
 <template>
   <q-page
     class="flex flex-center full-height">
-    <q-btn
-      id="download-link"
-      round
-      color="primary"
-      size="md"
-      icon="save_alt"
-      v-if="!transitionHappening"
-      @click="generateScreenshotAndDownload"
-      data-html2canvas-ignore="true"
-    ></q-btn>
-    <q-btn
-      id="share-screenshot"
-      round
-      color="primary"
-      size="md"
-      icon="share"
-      v-if="!transitionHappening"
-      @click="share"
-      data-html2canvas-ignore="true"
-    ></q-btn>
-    <q-btn
-      id="open-drawer-button"
-      round
-      color="primary"
-      size="md"
-      icon="more_vert"
-      v-if="!transitionHappening"
-      @click="$parent.$parent.$parent.leftDrawerOpen = !$parent.$parent.$parent.leftDrawerOpen"
-      data-html2canvas-ignore="true"
-    ></q-btn>
+    <transition name="slide-fade">
+      <q-btn
+        id="download-link"
+        round
+        color="primary"
+        size="md"
+        icon="save_alt"
+        v-if="showButtons"
+        @click="generateScreenshotAndDownload"
+        data-html2canvas-ignore="true"
+      ></q-btn>
+    </transition>
+    <transition name="slide-fade">
+      <q-btn
+        id="share-screenshot"
+        round
+        color="primary"
+        size="md"
+        icon="share"
+        v-if="showButtons"
+        @click="share"
+        data-html2canvas-ignore="true"
+      ></q-btn>
+    </transition>
+    <transition name="slide-fade">
+      <q-btn
+        id="open-drawer-button"
+        round
+        color="primary"
+        size="md"
+        icon="more_vert"
+        v-if="showButtons"
+        @click="$parent.$parent.$parent.leftDrawerOpen = !$parent.$parent.$parent.leftDrawerOpen"
+        data-html2canvas-ignore="true"
+      ></q-btn>
+    </transition> 
     <div
-      class="full-height"
+      class="full-height bg-serious"
       id="main-div">
       <transition name="fade">
         <transitional-slide v-if="transitionHappening"></transitional-slide> 
@@ -43,10 +49,12 @@
             v-html="phrase">
           </div>
           <div id="next-div">
-            <div id="next"
-                 @click="loadPhrase"
-                 v-if="!transitionHappening"
-                 data-html2canvas-ignore="true"></div>
+            <transition name="bounce">
+              <div id="next"
+                  @click="loadPhrase"
+                  v-if="showButtons"
+                  data-html2canvas-ignore="true"></div>
+            </transition>
           </div>
         </div>  
     </div>
@@ -56,6 +64,7 @@
 <script>
 import TransitionalSlide from '../components/TransitionalSlide.vue'
 import html2canvas from 'html2canvas'
+
 
 export default {
   data() {
@@ -67,34 +76,51 @@ export default {
         appWebsite: 'https://andrepestana.github.io/cn/',
         sharingMessage: 'Check this out! xD',
         sharedFileName: 'chucknorris.png',
-        apiEndpoint: "https://api.icndb.com/jokes/random"
+        apiEndpoint: "https://api.icndb.com/jokes/random",
+        showButtons: false
       }
   },
   methods: {
     loadPhrase: function() {
+      this.setBgSmilingImage()
+      this.showButtons = false
       this.transitionHappening = true
       this.phrase = ""
       this.$http.get(this.apiEndpoint).then(result => {
+        this.transitionHappening = false
+        this.phrase = result.body.value.joke
         setTimeout(() => {
-            this.transitionHappening = false
-            this.phrase = result.body.value.joke
-          }, 300
+            this.showButtons = true
+            this.setBgSeriousImage()
+            this.getScreenShot()
+          }, 1500
         )
       }, error => {
         console.log(error)
       })
     }, 
+    setBgSmilingImage: function() {
+      document.getElementById('main-div').classList.remove('bg-serious')
+      document.getElementById('main-div').classList.add('bg-smiling')
+    },
+    setBgSeriousImage: function() {
+      document.getElementById('main-div').classList.remove('bg-smiling')
+      document.getElementById('main-div').classList.add('bg-serious')
+    },
     getScreenShot() {
       return new Promise((resolve, reject) => {
-        const self = this;
+        const self = this
 
         html2canvas(document.getElementById('main-div'), {
               onclone: function (clonedDoc) {
-                let appWebsiteNode = document.createTextNode(self.appWebsite);
-                clonedDoc.getElementById('next-div').appendChild(appWebsiteNode)
+                let newDiv = document.createElement("div") 
+                let appWebsiteUrlNode = document.createTextNode(self.appWebsite)
+                newDiv.appendChild(appWebsiteUrlNode)
+                newDiv.classList.add('website-url')
+                clonedDoc.getElementById('next-div').appendChild(newDiv)
           }
         }).then(function(canvas) {
-            self.screenshot = canvas.toDataURL();
+            self.screenshot = canvas.toDataURL()
             resolve()
         }).catch(error => {
             console.log(error)
@@ -103,24 +129,36 @@ export default {
       })
     },
     generateScreenshotAndDownload() {
-      this.getScreenShot().then(() => {
+      if(this.screenshot) {
         if (window.cordova && cordova.platformId !== "browser") {
-          // THIS WORKS ON CORDOVA
-          var blob = this.dataURItoBlob(this.screenshot)
-          this.download('file.png', blob, 'image/png')
+          this.downloadForCordova()
         } else {
-          // THIS WORKS ON BROWSER
-          const blob = this.b64toBlob(this.screenshot, 'image/png');
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.setAttribute('download', this.sharedFileName) //or any other extension
-          document.body.appendChild(link)
-          link.click()
+          this.downloadForBrowser()
         }
-      }).catch(error => {
-        console.log(error)
-      })
+      } else {
+        this.getScreenShot().then(() => {
+          if (window.cordova && cordova.platformId !== "browser") {
+            downloadForCordova()
+          } else {
+            this.downloadForBrowser()
+          }
+        }).catch(error => {
+          console.log(error)
+        })
+      }
+    },
+    downloadForCordova() {
+      var blob = this.dataURItoBlob(this.screenshot)
+      this.download('file.png', blob, 'image/png')
+    },
+    downloadForBrowser() {
+      const blob = this.b64toBlob(this.screenshot, 'image/png');
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', this.sharedFileName) //or any other extension
+      document.body.appendChild(link)
+      link.click()
     },
     b64toBlob(b64Data, contentType='', sliceSize=512)  {
       const byteCharacters = atob(b64Data.replace(/^data:image\/(png|jpeg|jpg);base64,/, ''));
@@ -260,6 +298,13 @@ export default {
       return blob;
     },
     share() {
+      if(this.screenshot) {
+        window.plugins.socialsharing.share(
+          this.sharingMessage, 
+          this.sharedFileName, 
+          this.screenshot,
+          this.appWebsite)
+      } else {
         this.getScreenShot().then(() => {
           window.plugins.socialsharing.share(
             this.sharingMessage, 
@@ -269,6 +314,7 @@ export default {
         }).catch(error => {
           console.log(error)
         })
+      }
     },
   },
   mounted() {
@@ -291,7 +337,7 @@ html, body {
 }
 #main-div {
   width: 100%;
-  background-image: url('~assets/chucknorris.jpg');
+  //background-image: url('~assets/chucknorris.jpg');
   -webkit-background-size: cover;
   -moz-background-size: cover;
   -o-background-size: cover;
@@ -299,8 +345,14 @@ html, body {
   background-position: center; /* Center the image */
   background-repeat: no-repeat; /* Do not repeat the image */
 }
+.bg-smiling {
+  background-image: url('~assets/chucknorris_smiling.jpg');
+}
+.bg-serious {
+  background-image: url('~assets/chucknorris.jpg');
+}
 #phrase-outer-div {
-  margin: 0;
+  margin-right: 120px;
   text-align: center;
   position: absolute;
   top: 100%;
@@ -308,13 +360,20 @@ html, body {
   transform: translate(-50%, -100%);
   color: rgb(255, 230, 0);
   text-shadow: 0.075em 0.08em 0.1em rgba(0, 0, 0, 1);
-  font-size: 4vh;
+  font-size: 3vh;
   width: fit-content;
   font-weight: bold;
 }
 #phrase-text-div {
-  background-color: rgba(128, 128, 128, 0.438);
-  margin:20px;
+  background-color: rgba(128, 128, 128, 0.7);
+  margin:0px;
+}
+.website-url {
+    color: rgb(242, 246, 246);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 16px;
+    background-color: rgba(11, 6, 49, 0.746);
+    border-radius: 5px;
 }
 #next-div {
   border: none;
@@ -324,12 +383,12 @@ html, body {
   cursor: pointer;
   text-align: center;
   display: inline-block;
-  min-height: 150px;
+  min-height: 120px;
 }
 #next {
   background-image: url('~assets/button.png'); 
   width: 150px;
-  height: 150px;
+  height: 120px;
   -webkit-background-size: cover;
   -moz-background-size: cover;
   -o-background-size: cover;
@@ -341,7 +400,7 @@ html, body {
 #next:active {
   background-image: url('~assets/button.png'); 
   width: 140px;
-  height: 140px;
+  height: 100px;
   -webkit-background-size: cover;
   -moz-background-size: cover;
   -o-background-size: cover;
@@ -349,26 +408,25 @@ html, body {
   background-position: center; /* Center the image */
   background-repeat: no-repeat; /* Do not repeat the image */
   cursor: pointer;
-
 }
 #open-drawer-button {
   position: fixed;
   top: 20px;
-  right: 20px;
+  right: 10px;
   cursor: pointer;
   z-index: 99;
 }
 #download-link {  
   position: fixed;
   top: 80px;
-  right: 20px;
+  right: 10px;
   cursor: pointer;
   z-index: 99;
 }
 #share-screenshot {
   position: fixed;
   top: 140px;
-  right: 20px;
+  right: 10px;
   cursor: pointer;
   z-index: 99;
 }
@@ -376,9 +434,37 @@ html, body {
   transition: opacity .5s;
 }
 .fade-leave-active {
-  transition: opacity 1s;
+  transition: opacity 1.3s;
 }
 .fade-enter, .fade-leave-to /* .fade-leave-active below version 2.1.8 */ {
+  opacity: 0;
+}
+.bounce-enter-active {
+  animation: bounce-in .5s;
+}
+.bounce-leave-active {
+  //animation: bounce-in .5s reverse;
+}
+@keyframes bounce-in {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.slide-fade-enter-active {
+  transition: all .8s ease;
+}
+.slide-fade-leave-active {
+  transition: all .5s cubic-bezier(1.0, 0.5, 0.8, 1.0);
+}
+.slide-fade-enter, .slide-fade-leave-to
+/* .slide-fade-leave-active below version 2.1.8 */ {
+  transform: translateX(20px);
   opacity: 0;
 }
 </style>
